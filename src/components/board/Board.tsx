@@ -49,7 +49,14 @@
  *     Space/Enter to drop, Escape to cancel.
  */
 
-import { useState, useCallback, useEffect } from 'react'
+/**
+ * Push 5 imports note:
+ *   useTasks removed -- Board no longer owns data fetching.
+ *   AppLayout calls useTasks() and passes all task data + handlers as props.
+ *   MutableRefObject imported so AppLayout can register the create modal opener.
+ *   TaskUpdate and NewTask imported for the prop type signatures.
+ */
+import { useState, useCallback, useEffect, type MutableRefObject } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -64,7 +71,6 @@ import {
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
 import { cn } from '@/lib/utils'
-import { useTasks } from '@/hooks/useTasks'
 import { useBoardState, getTaskById } from '@/hooks/useBoardState'
 import { BoardColumn } from './BoardColumn'
 import { BoardSkeleton } from './BoardSkeleton'
@@ -73,7 +79,7 @@ import { Modal } from '@/components/ui/Modal'
 import { CreateTaskModal } from './CreateTaskModal'
 import { TaskDetailModal } from './TaskDetailModal'
 import { COLUMNS } from '@/types'
-import type { FilterState, Task, TaskStatus } from '@/types'
+import type { FilterState, Task, TaskStatus, TaskUpdate, NewTask } from '@/types'
 
 // ─── DraggableCard ─────────────────────────────────────────────────────────────
 
@@ -200,31 +206,72 @@ function DroppableColumn({
 
 // ─── Board ─────────────────────────────────────────────────────────────────────
 
+/**
+ * BoardProps -- Push 5 expanded interface.
+ *
+ * Board no longer calls useTasks() or useSprint() internally.
+ * AppLayout owns all data fetching and passes everything down as props.
+ *
+ * Why this change?
+ *   - TopBar also needs tasks[] for stats + label filter.
+ *   - If Board owned useTasks(), there would be two separate Supabase fetches.
+ *   - Hoisting to AppLayout means one fetch, shared between TopBar and Board.
+ *   - Board stays focused on UI: drag-drop, modals, column rendering.
+ *
+ * openCreateModalRef:
+ *   Board registers its internal handleOpenCreateModal into this ref so
+ *   AppLayout's TopBar "New task" button can trigger it without prop-drilling
+ *   through multiple intermediate components. The ref is populated in a
+ *   useEffect after Board mounts. AppLayout reads ref.current on button click.
+ */
 interface BoardProps {
-  /** Current filter state from TopBar — passed to useBoardState for client-side filtering */
+  /** Current filter state from TopBar -- passed to useBoardState for client-side filtering */
   filters: FilterState
-  /** Callback for the TopBar "New task" button — opens the create modal with default status */
-  onOpenCreateModal?: () => void
+  /** All tasks for the current user -- fetched by AppLayout via useTasks() */
+  tasks: Task[]
+  /** True during the initial task fetch -- shows BoardSkeleton */
+  tasksLoading: boolean
+  /** Error string if task fetch failed, null otherwise */
+  tasksError: string | null
+  /** Create a new task -- from useTasks(), called by CreateTaskModal */
+  createTask: (newTask: NewTask) => Promise<Task>
+  /** Update task fields -- from useTasks(), called by TaskDetailModal */
+  updateTask: (id: string, changes: TaskUpdate) => Promise<void>
+  /** Delete a task permanently -- from useTasks(), called by TaskDetailModal */
+  deleteTask: (id: string) => Promise<void>
+  /**
+   * Optimistically move task to new column for drag-and-drop.
+   * Updates local state immediately, rolls back on Supabase failure.
+   */
+  moveTask: (id: string, newStatus: TaskStatus) => Promise<void>
+  /**
+   * Ref that Board populates with its "open create modal" handler.
+   * AppLayout's TopBar "New task" button calls ref.current?.() to open it.
+   * Replaces the Push 4 window.__openCreateTask hack.
+   */
+  openCreateModalRef: MutableRefObject<(() => void) | null>
 }
 
-export function Board({ filters, onOpenCreateModal }: BoardProps) {
+export function Board({
+  filters,
+  tasks,
+  tasksLoading,
+  tasksError,
+  createTask,
+  updateTask,
+  deleteTask,
+  moveTask,
+  openCreateModalRef,
+}: BoardProps) {
 
-  // ── Data ────────────────────────────────────────────────────────────────────
-
-  const {
-    tasks,
-    loading,
-    error,
-    moveTask,
-    createTask,
-    updateTask,
-    deleteTask,
-  } = useTasks()
+  // ── Board state (grouped + filtered) ────────────────────────────────────────
 
   /**
-   * boardState — tasks grouped by column, filtered by the search/priority/label state.
+   * boardState -- tasks grouped by column, filtered by search/priority/label.
    * { todo: Task[], in_progress: Task[], in_review: Task[], done: Task[] }
-   * Memoized — only recomputes when tasks or filters change.
+   *
+   * useBoardState memoizes -- only recomputes when tasks or filters change.
+   * Board does NOT call useTasks() anymore -- tasks arrive via props from AppLayout.
    */
   const boardState = useBoardState(tasks, filters)
 
@@ -345,36 +392,42 @@ export function Board({ filters, onOpenCreateModal }: BoardProps) {
     setCreateModalOpen(false)
   }, [])
 
-  // ── Expose create modal opener to window ────────────────────────────────────
+  // ── Expose create modal opener via ref ─────────────────────────────────────
 
   /**
-   * Expose handleOpenCreateModal on window.__openCreateTask so AppLayout's
-   * TopBar "New task" button can open the modal without prop-drilling.
+   * handleOpenCreateModal -- opens the create modal with the default 'todo' status.
    *
-   * This is a pragmatic shortcut for a single-page app. Push 5 replaces this
-   * with a proper callback prop once AppLayout is refactored.
+   * Push 5 change: previously exposed on window.__openCreateTask (global hack).
+   * Now registered into openCreateModalRef (passed from AppLayout).
    *
-   * We use useEffect so this runs after render (not during), which is the
-   * correct place for DOM/global side effects in React.
-   */
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    (window as unknown as { __openCreateTask?: () => void }).__openCreateTask = handleOpenCreateModal
-    return () => {
-      delete (window as unknown as { __openCreateTask?: () => void }).__openCreateTask
-    }
-  }, [handleOpenCreateModal])
-
-  /**
-   * handleOpenCreateModal — called by the TopBar "New task" button via AppLayout.
-   * Opens the create modal with the default 'todo' status.
-   * We also expose this for the onOpenCreateModal prop so AppLayout
-   * can wire the TopBar button without needing internal Board state.
+   * AppLayout holds the ref. TopBar calls AppLayout's handleOpenCreateModal,
+   * which calls openCreateModalRef.current?.(). This function is that target.
+   *
+   * useCallback with empty deps: this function only needs setCreateModalOpen
+   * and setCreateDefaultStatus, which are stable setState dispatchers -- they
+   * never change between renders, so empty deps is correct and avoids
+   * re-registering the ref unnecessarily.
    */
   const handleOpenCreateModal = useCallback(() => {
     setCreateDefaultStatus('todo')
     setCreateModalOpen(true)
   }, [])
+
+  /**
+   * Register handleOpenCreateModal into openCreateModalRef after mount.
+   *
+   * useEffect is the correct place for this side effect (ref mutation)
+   * because it runs after the component mounts and the function is stable.
+   *
+   * Cleanup: set ref.current to null when Board unmounts so AppLayout
+   * doesn't hold a reference to a dead component's function.
+   */
+  useEffect(() => {
+    openCreateModalRef.current = handleOpenCreateModal
+    return () => {
+      openCreateModalRef.current = null
+    }
+  }, [openCreateModalRef, handleOpenCreateModal])
 
   // ── renderTask — render prop factory ────────────────────────────────────────
 
@@ -407,9 +460,9 @@ export function Board({ filters, onOpenCreateModal }: BoardProps) {
 
   // ── Loading + error states ──────────────────────────────────────────────────
 
-  if (loading) return <BoardSkeleton />
+  if (tasksLoading) return <BoardSkeleton />
 
-  if (error) {
+  if (tasksError) {
     return (
       <div className="flex h-full items-center justify-center p-8">
         <div className="text-center max-w-sm">
@@ -424,7 +477,7 @@ export function Board({ filters, onOpenCreateModal }: BoardProps) {
             </svg>
           </div>
           <p className="font-sans font-500 text-pitch-100 text-[14px] mb-1">Failed to load tasks</p>
-          <p className="font-mono text-[11px] text-pitch-400 mb-4 break-all">{error}</p>
+          <p className="font-mono text-[11px] text-pitch-400 mb-4 break-all">{tasksError}</p>
           <button
             onClick={() => window.location.reload()}
             className="px-4 py-2 bg-pitch-800 hover:bg-pitch-700 border border-pitch-500/40 rounded-lg font-sans text-[13px] text-pitch-100 transition-colors"
