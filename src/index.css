@@ -158,7 +158,7 @@
   }
 
   /*
-   * .board-scroll — the horizontal scroll container for the Kanban board.
+   * .board-scroll -- the horizontal scroll container for the Kanban board.
    * We want smooth scrolling and hidden scrollbar on the board itself
    * (the individual columns handle their own vertical scroll).
    */
@@ -172,5 +172,63 @@
   /* Each column snaps to position when scrolling the board */
   .board-scroll > * {
     scroll-snap-align: start;
+  }
+
+  /*
+   * .toast-slide-in -- entrance animation for toast notification chips.
+   * Slides in from the bottom-right corner with a slight fade.
+   * Duration is 0.25s -- fast enough to not feel sluggish, slow enough to notice.
+   */
+  .toast-slide-in {
+    animation: toast-slide-in 0.25s ease-out forwards;
+  }
+
+  /*
+   * .toast-slide-out -- exit animation for toast chips as they auto-dismiss.
+   * Slides back down and fades out. Triggered by adding the class in JS.
+   */
+  .toast-slide-out {
+    animation: toast-slide-out 0.2s ease-in forwards;
+  }
+
+  /*
+   * .overdue-glow -- red column header glow used when a column has overdue tasks.
+   * Applied to the column border-top accent in Push 7.
+   * box-shadow + border color together create a visible urgency signal.
+   * The glow is subtle -- an alarm, not a siren.
+   */
+  .overdue-glow {
+    box-shadow: 0 0 0 1px rgba(239,68,68,0.4), 0 0 12px rgba(239,68,68,0.15);
+  }
+}
+
+
+/* ─── 6. Keyframes ────────────────────────────────────────────────────────── */
+
+/*
+ * Toast notification slide-in: enters from below, fades in.
+ * Using CSS (not Tailwind keyframes) because these are used in @layer utilities
+ * above, and Tailwind keyframes defined in tailwind.config.js can't be
+ * referenced from index.css @layer utilities directly.
+ */
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toast-slide-out {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.97);
   }
 }
