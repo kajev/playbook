@@ -1,0 +1,176 @@
+/*
+ * index.css — Global styles
+ *
+ * Structure:
+ * 1. Tailwind directives (base, components, utilities)
+ * 2. CSS custom properties (design tokens not in Tailwind)
+ * 3. Base element resets
+ * 4. Custom scrollbar styling
+ * 5. Utility classes for things Tailwind can't do inline
+ */
+
+/* ─── 1. Tailwind Directives ─────────────────────────────────────────────── */
+
+/* @tailwind base injects Preflight — a normalize.css-like reset.
+   This zeroes margins, sets box-sizing: border-box, etc. */
+@tailwind base;
+
+/* @tailwind components is where you'd put @layer components {} blocks.
+   We use it sparingly — most components live in TSX with Tailwind classes. */
+@tailwind components;
+
+/* @tailwind utilities injects all the generated utility classes
+   (bg-pitch-900, text-volt-500, etc.) based on our tailwind.config.js */
+@tailwind utilities;
+
+
+/* ─── 2. CSS Custom Properties ───────────────────────────────────────────── */
+
+:root {
+  /*
+   * These are values that either:
+   * a) Can't be expressed cleanly in Tailwind (like gradients)
+   * b) Need to be referenced in non-Tailwind contexts (like the shimmer animation)
+   */
+
+  /* Shimmer gradient for loading skeletons.
+     Animates from dark → slightly lighter → dark to simulate a scanning light. */
+  --shimmer-gradient: linear-gradient(
+    90deg,
+    theme('colors.pitch.800') 0%,
+    theme('colors.pitch.700') 50%,
+    theme('colors.pitch.800') 100%
+  );
+
+  /* Column drag-over highlight — a subtle volt border glow */
+  --drag-over-border: 1px solid theme('colors.volt.500');
+}
+
+
+/* ─── 3. Base Element Resets ─────────────────────────────────────────────── */
+
+@layer base {
+  /*
+   * Set the default background to our deepest pitch color.
+   * Without this, there'd be a white flash before React renders.
+   */
+  html {
+    background-color: theme('colors.pitch.950');
+    color: theme('colors.pitch.100');
+    font-family: 'DM Sans', system-ui, sans-serif;
+    /* Smooth font rendering on macOS/retina */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /*
+   * Remove default focus outlines and replace with our volt-colored ring.
+   * This ensures keyboard navigation is always visible and on-brand.
+   */
+  *:focus-visible {
+    outline: 2px solid theme('colors.volt.500');
+    outline-offset: 2px;
+  }
+
+  /* Remove default button styling so our Tailwind classes take over */
+  button {
+    cursor: pointer;
+  }
+}
+
+
+/* ─── 4. Custom Scrollbar ────────────────────────────────────────────────── */
+
+/*
+ * We style scrollbars to match the dark theme.
+ * The board has horizontal scroll for many columns,
+ * and each column has vertical scroll for many cards.
+ * 
+ * Note: ::-webkit-scrollbar only works in Chrome/Safari/Edge.
+ * Firefox uses scrollbar-width + scrollbar-color (set below).
+ */
+
+/* Make scrollbars thin and unobtrusive */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+/* The track (background of the scrollbar) */
+::-webkit-scrollbar-track {
+  background: theme('colors.pitch.900');
+  border-radius: 3px;
+}
+
+/* The thumb (the draggable handle) */
+::-webkit-scrollbar-thumb {
+  background: theme('colors.pitch.500');
+  border-radius: 3px;
+}
+
+/* Thumb on hover — slightly brighter */
+::-webkit-scrollbar-thumb:hover {
+  background: theme('colors.pitch.400');
+}
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: theme('colors.pitch.500') theme('colors.pitch.900');
+}
+
+
+/* ─── 5. Utility Classes ─────────────────────────────────────────────────── */
+
+@layer utilities {
+  /*
+   * .shimmer — loading skeleton animation.
+   * Applied to placeholder elements while data loads from Supabase.
+   * The background-size of 200% allows the gradient to sweep across.
+   */
+  .shimmer {
+    background: var(--shimmer-gradient);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite linear;
+  }
+
+  /*
+   * .drag-over — applied to a column when a card is dragged over it.
+   * We can't use Tailwind for this because it's applied dynamically via JS
+   * and we need the CSS custom property for the border.
+   */
+  .drag-over {
+    border: var(--drag-over-border) !important;
+    box-shadow: theme('boxShadow.volt');
+  }
+
+  /*
+   * .line-clamp-2 — truncates text to 2 lines with an ellipsis.
+   * Used on task card titles to keep cards a consistent height.
+   * Tailwind has this built in as line-clamp-2 in v3+ — but we define it
+   * here explicitly so the intent is clear.
+   */
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /*
+   * .board-scroll — the horizontal scroll container for the Kanban board.
+   * We want smooth scrolling and hidden scrollbar on the board itself
+   * (the individual columns handle their own vertical scroll).
+   */
+  .board-scroll {
+    overflow-x: auto;
+    scroll-snap-type: x proximity;
+    /* Pad the right so the last column doesn't sit flush against the edge */
+    padding-right: 1.5rem;
+  }
+
+  /* Each column snaps to position when scrolling the board */
+  .board-scroll > * {
+    scroll-snap-align: start;
+  }
+}
