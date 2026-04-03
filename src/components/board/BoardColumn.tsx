@@ -153,6 +153,9 @@ export function BoardColumn({ status, tasks, onTaskClick, onAddTask, renderTask,
         'border-t-2', config.accent,
         // Drag-over visual feedback (Push 4 will toggle this)
         isOver && 'drag-over',
+        // overdue-glow: red top shadow when column has past-due tasks (not 'done')
+        // Defined in index.css -- subtle urgency signal on the column border
+        hasUrgentTask && status !== 'done' && 'overdue-glow',
       )}
     >
 
