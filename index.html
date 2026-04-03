@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <!--
+    We set class="dark" on <html> so Tailwind's darkMode: 'class' strategy
+    activates dark variants globally. The entire app is dark-themed.
+  -->
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Playbook — Team Task Board</title>
+    <meta name="description" content="A fast, focused Kanban board for sports teams and game studios." />
+
+    <!--
+      Google Fonts:
+      - DM Sans: clean, modern sans for body text. Feels contemporary without being bland.
+      - DM Mono: monospaced for labels, counts, metadata. Scoreboard aesthetic.
+      - Space Grotesk: geometric display for big numbers (stats, sprint %). Punchy.
+      
+      We use display=swap so text renders in fallback immediately,
+      then swaps to the loaded font — no invisible text flash.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!--
+      React mounts into #root. The body background matches our darkest pitch color
+      so there's no flash of white before React renders.
+    -->
+    <div id="root"></div>
+
+    <!--
+      Vite injects the script tag for our React app here during build.
+      In dev, this serves from the Vite dev server with HMR.
+    -->
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

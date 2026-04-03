@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!--
+    Playbook favicon — a volt-colored lightning bolt on a dark background.
+    Keeps the brand mark consistent across the browser tab and bookmarks.
+    SVG favicons are supported in all modern browsers.
+  -->
+
+  <!-- Dark rounded square background — matches the app's pitch-900 sidebar color -->
+  <rect width="32" height="32" rx="8" fill="#0f1318"/>
+
+  <!--
+    Lightning bolt path — drawn to fit within the 32x32 viewbox.
+    The bolt points downward-right, which reads as "fast" and "energetic".
+    Color: volt-500 (#c8ff00) — the app's signature accent.
+  -->
+  <path
+    d="M19 4L10 18h7l-4 10 13-16h-7L19 4z"
+    fill="#c8ff00"
+  />
+</svg>

@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    // Target modern browsers — we're not supporting IE
+    "target": "ES2020",
+    // Use bundler module resolution (Vite handles imports)
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    // Don't emit — Vite handles that
+    "noEmit": true,
+    "jsx": "react-jsx",
+    // Strict mode catches the most bugs at compile time
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    // Path alias so we can import from @/ instead of ../../../
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
