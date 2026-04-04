@@ -90,7 +90,6 @@ export function useSprint(): UseSprintReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load sprint'
       setError(message)
-      console.error('[useSprint] fetchActiveSprint failed:', err)
     }
   }, [])
 
