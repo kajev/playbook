@@ -8,7 +8,7 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
 import { differenceInCalendarDays, parseISO, isValid } from 'date-fns'
-import type { TaskPriority, FilterState, Task } from '@/types'
+import type { FilterState, Task } from '@/types'
 
 
 // ─── Class Name Utility ───────────────────────────────────────────────────────

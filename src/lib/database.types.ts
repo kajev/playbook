@@ -10,6 +10,9 @@
  * which gives us autocomplete for table names, column names, and return types.
  *
  * If you add columns to your Supabase tables, update this file to match.
+ *
+ * NOTE: The `Relationships` field on each table is required by @supabase/supabase-js v2.
+ * Without it, the client's internal generics collapse Insert/Update to `never`.
  */
 
 export type Database = {
@@ -67,6 +70,14 @@ export type Database = {
           due_date?:    string | null
           labels?:      string[]
         }
+
+        /**
+         * Relationships — required by @supabase/supabase-js v2 type machinery.
+         * Without this field the client's internal generics resolve Insert/Update
+         * to `never`, causing TS2769 errors throughout the codebase.
+         * We have no foreign-key joins to declare, so this is an empty array.
+         */
+        Relationships: []
       }
 
       // ─── sprints table ──────────────────────────────────────────────────────
@@ -97,6 +108,12 @@ export type Database = {
           end_date?:   string
           is_active?:  boolean
         }
+
+        /**
+         * Relationships — required by @supabase/supabase-js v2 type machinery.
+         * Empty array: no foreign-key joins declared for this table.
+         */
+        Relationships: []
       }
     }
 

@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 /**
  * lib/supabase.ts — Supabase client initialization
  *
@@ -17,6 +18,11 @@
  * - VITE_SUPABASE_ANON_KEY: your project's public anon key
  * - These are set in .env.local (never committed to git — see .gitignore)
  * - On Vercel, set them in the Environment Variables section of your project settings
+ *
+ * NOTE: The `/// <reference types="vite/client" />` directive at the top of this
+ * file is what tells TypeScript about `import.meta.env`. Without it, tsc sees
+ * `ImportMeta` as the bare DOM type which has no `env` property (TS2339).
+ * Vite's client types augment ImportMeta to add the `env` field.
  */
 
 import { createClient } from '@supabase/supabase-js'
