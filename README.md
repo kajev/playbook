@@ -1,278 +1,39 @@
-# Playbook — Kanban Task Board
+# Playbook
 
-A fast, focused Kanban board built for sports teams and game studios.
-Inspired by Linear and Asana — designed to feel like it was built for Next Play Games specifically.
+A Kanban task board built for **Next Play Games**. Dark mode, energetic volt accent, drag-and-drop columns, sprint management, and real-time Supabase persistence.
 
----
-
-## Live Demo
-
-> **[https://playbook-kanban.vercel.app](https://playbook-kanban.vercel.app)**
-> *(URL updated after Vercel deployment)*
-
-## GitHub Repository
-
-> **[https://github.com/your-username/playbook](https://github.com/your-username/playbook)**
-> *(Update with your actual repo URL)*
-
----
-
-## Tech Stack
-
-| Layer | Technology | Why |
-|---|---|---|
-| Frontend | React 18 + TypeScript | Type safety, component model |
-| Build tool | Vite | Fast HMR, instant builds |
-| Styling | Tailwind CSS | Utility-first, no CSS files to manage |
-| Database | Supabase (Postgres) | Free tier, built-in auth, RLS |
-| Auth | Supabase Anonymous Auth | Guest sessions, no sign-up required |
-| Drag & Drop | @dnd-kit/core | Modern, accessible, no deprecated APIs |
-| Dates | date-fns | Lightweight, tree-shakeable date utilities |
-| Icons | Lucide React | Consistent, clean icon set |
-| Hosting | Vercel | Zero-config deploys from GitHub |
-
----
-
-## Local Setup
-
-### Prerequisites
-- Node.js 18+ (check with `node --version`)
-- A free [Supabase](https://supabase.com) account
-
-### 1. Clone and install
-
-```bash
-git clone https://github.com/your-username/playbook.git
-cd playbook
-npm install
-```
-
-### 2. Create your Supabase project
-
-1. Go to [supabase.com](https://supabase.com) → New Project
-2. Wait for the project to provision (~1 min)
-3. Go to **Project Settings → API**
-4. Copy your **Project URL** and **anon public** key
-
-### 3. Set up environment variables
-
-```bash
-cp .env.local.example .env.local
-```
-
-Edit `.env.local`:
-```
-VITE_SUPABASE_URL=https://your-project-id.supabase.co
-VITE_SUPABASE_ANON_KEY=your-anon-key-here
-```
-
-### 4. Run the database schema
-
-In your Supabase project, go to **SQL Editor** and run the full schema below.
-
-### 5. Start the dev server
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:5173](http://localhost:5173)
-
----
-
-## Database Schema
-
-Run this entire block in the Supabase SQL Editor:
-
-```sql
--- ─────────────────────────────────────────────────────────────────────────────
--- Playbook — Full Database Schema
--- Run this in: Supabase Dashboard → SQL Editor → New Query
--- ─────────────────────────────────────────────────────────────────────────────
-
-
--- ─── Enable UUID extension ───────────────────────────────────────────────────
--- gen_random_uuid() generates UUID v4 primary keys automatically on insert.
--- This extension is available in all Supabase projects by default.
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
-
-
--- ─── Tasks Table ─────────────────────────────────────────────────────────────
-CREATE TABLE IF NOT EXISTS tasks (
-  -- Primary key — UUID generated automatically on insert
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
-  -- Required fields
-  title         TEXT NOT NULL CHECK (char_length(title) > 0 AND char_length(title) <= 500),
-  status        TEXT NOT NULL DEFAULT 'todo'
-                  CHECK (status IN ('todo', 'in_progress', 'in_review', 'done')),
-  priority      TEXT NOT NULL DEFAULT 'normal'
-                  CHECK (priority IN ('high', 'normal', 'low')),
-
-  -- Optional fields
-  description   TEXT,
-  due_date      DATE,                    -- 'YYYY-MM-DD' — stored as Postgres DATE
-  labels        TEXT[] NOT NULL DEFAULT '{}',   -- Array of label strings
-
-  -- Foreign key to Supabase auth users
-  -- ON DELETE CASCADE: if the auth user is deleted, their tasks go too
-  user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-
-  -- Timestamps
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Index on user_id — every query filters by user_id (via RLS), so this
--- index makes those queries fast even with many rows in the table
-CREATE INDEX IF NOT EXISTS tasks_user_id_idx ON tasks(user_id);
-
--- Index on status — we query tasks by status when building each column
-CREATE INDEX IF NOT EXISTS tasks_status_idx ON tasks(status);
-
--- Index on created_at — default sort order for tasks within a column
-CREATE INDEX IF NOT EXISTS tasks_created_at_idx ON tasks(created_at DESC);
-
-
--- ─── Sprints Table ────────────────────────────────────────────────────────────
--- Stores sprint/milestone data for the sprint banner in the header.
--- Each user can have multiple sprints; only is_active=true is shown.
-CREATE TABLE IF NOT EXISTS sprints (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name          TEXT NOT NULL CHECK (char_length(name) > 0),
-  start_date    DATE NOT NULL,
-  end_date      DATE NOT NULL CHECK (end_date > start_date),
-  is_active     BOOLEAN NOT NULL DEFAULT true,
-  user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
--- Only one active sprint per user at a time
--- This partial unique index enforces that business rule at the DB level
-CREATE UNIQUE INDEX IF NOT EXISTS sprints_one_active_per_user
-  ON sprints(user_id) WHERE (is_active = true);
-
-CREATE INDEX IF NOT EXISTS sprints_user_id_idx ON sprints(user_id);
-
-
--- ─── Row Level Security (RLS) ─────────────────────────────────────────────────
---
--- RLS is the core security mechanism. Without it, any user with the anon key
--- could read and modify ALL rows in the database.
---
--- With RLS enabled and these policies:
---   - User A can ONLY read/write rows where user_id = User A's auth.uid()
---   - User B can ONLY read/write rows where user_id = User B's auth.uid()
---   - Even if User B knows User A's task ID, they cannot access it
---
--- auth.uid() is a Supabase function that returns the current authenticated
--- user's UUID. It's evaluated per-row, per-request.
---
--- IMPORTANT: We use USING (user_id = auth.uid()) which applies to SELECT,
--- UPDATE, and DELETE. For INSERT, we use WITH CHECK to ensure inserted rows
--- have the correct user_id (can't insert for another user).
-
--- Enable RLS on both tables
-ALTER TABLE tasks   ENABLE ROW LEVEL SECURITY;
-ALTER TABLE sprints ENABLE ROW LEVEL SECURITY;
-
--- ── Tasks policies ────────────────────────────────────────────────────────────
-
--- SELECT: users can only read their own tasks
-CREATE POLICY "tasks_select_own" ON tasks
-  FOR SELECT USING (user_id = auth.uid());
-
--- INSERT: users can only create tasks for themselves
--- WITH CHECK ensures the user_id they try to insert matches their auth.uid()
--- This prevents a malicious user from inserting tasks with someone else's user_id
-CREATE POLICY "tasks_insert_own" ON tasks
-  FOR INSERT WITH CHECK (user_id = auth.uid());
-
--- UPDATE: users can only update their own tasks
-CREATE POLICY "tasks_update_own" ON tasks
-  FOR UPDATE USING (user_id = auth.uid());
-
--- DELETE: users can only delete their own tasks
-CREATE POLICY "tasks_delete_own" ON tasks
-  FOR DELETE USING (user_id = auth.uid());
-
--- ── Sprints policies ──────────────────────────────────────────────────────────
-
-CREATE POLICY "sprints_select_own" ON sprints
-  FOR SELECT USING (user_id = auth.uid());
-
-CREATE POLICY "sprints_insert_own" ON sprints
-  FOR INSERT WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "sprints_update_own" ON sprints
-  FOR UPDATE USING (user_id = auth.uid());
-
-CREATE POLICY "sprints_delete_own" ON sprints
-  FOR DELETE USING (user_id = auth.uid());
-
-
--- ─── Anonymous Auth ───────────────────────────────────────────────────────────
--- No SQL needed here — anonymous sign-in is enabled in the Supabase Dashboard:
--- Authentication → Providers → Anonymous Sign-ins → Enable
--- The app calls supabase.auth.signInAnonymously() which creates a real
--- auth.users row with a UUID, enabling RLS policies to work correctly.
-
-
--- ─── Done! ────────────────────────────────────────────────────────────────────
--- Your schema is ready. The app will work as soon as you:
--- 1. Enable Anonymous Sign-ins in Auth settings (see above)
--- 2. Set your VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local
-```
+**Live:** https://playbook-psi-nine.vercel.app
+**Repo:** https://github.com/kajev/playbook
 
 ---
 
 ## Features
 
-### Required
-- **Kanban board** — 4 columns: To Do, In Progress, In Review, Done
-- **Drag and drop** — move tasks between columns via @dnd-kit
-- **Task creation** — title, description, priority, due date, labels
-- **Guest sessions** — anonymous Supabase auth, auto-created on first load
-- **Data persistence** — all tasks saved to Supabase Postgres
-- **Row Level Security** — users can only access their own tasks
-- **Loading + error states** — throughout the app
-
-### Advanced Features Built
-- **Due date indicators** — overdue (red), due soon (amber) badges on cards
-- **Stats strip** — total tasks, completed, overdue count in the header
-- **Search + filter** — real-time search by title/description; filter by priority
-- **Sprint/milestone banner** — sprint name, days remaining, completion percentage
-- **Labels/tags** — color-coded labels on tasks, filterable
+- Anonymous guest sessions via Supabase Auth -- no signup required, board persists across sessions
+- Four-column Kanban board: To Do, In Progress, In Review, Done
+- Drag and drop cards between columns with optimistic updates and automatic rollback on failure
+- Create, edit, and delete tasks with title, description, priority, due date, and labels
+- Sprint banner showing active sprint name, days left, task completion %, and animated progress bar
+- Sprint management modal -- create, edit, and end sprints
+- Board stats strip -- total tasks, done, in-play, and late counts
+- Label filter, priority filter, and full-text search across title and description
+- Overdue glow on columns that contain past-due tasks
+- Toast notifications for mutation errors with auto-dismiss
+- Sports-flavored empty states per column
 
 ---
 
-## Architecture & Design Decisions
+## Tech Stack
 
-### Why Supabase directly (no backend)?
-The assessment allows calling Supabase directly from the frontend. With RLS policies enforcing data isolation, there's no security benefit to adding a backend API layer for this use case. It also eliminates latency (no extra hop) and deployment complexity.
-
-### Why @dnd-kit over react-beautiful-dnd?
-react-beautiful-dnd is deprecated and unmaintained. @dnd-kit is its modern successor — actively maintained, accessible by default, and works with React 18's concurrent features.
-
-### Why optimistic updates?
-When a user drags a task to a new column, the UI updates immediately without waiting for the Supabase network round-trip. If the update fails, we roll back. This makes the board feel instant.
-
-### Why client-side filtering?
-We fetch all tasks once and filter in memory. At the expected scale (< 500 tasks per guest user), this is instant and avoids the latency of re-querying Supabase on every keypress. For thousands of tasks, we'd move filtering to the Supabase query.
-
-### Dark sports theme
-The design uses a deep dark palette (pitch-950 → pitch-700) with an electric lime accent (volt-500: #c8ff00). This was intentional for Next Play Games — feels energetic and game-studio appropriate, distinct from generic light-mode SaaS tools.
-
----
-
-## What I'd Improve With More Time
-
-1. **Real-time sync** — Supabase supports `supabase.channel().on('postgres_changes')` for live updates. Multiple users on the same board would see changes instantly.
-2. **Drag to reorder within a column** — currently drag only moves between columns. @dnd-kit's `SortableContext` supports within-column ordering.
-3. **Task detail panel** — a slide-out panel (not modal) for editing all task fields inline.
-4. **Activity log** — a `task_activity` table tracking status changes, edits, timestamps.
-5. **Team/assignees** — a `team_members` table with avatar support.
-6. **Mobile layout** — stacked single-column view on small screens with swipe gestures.
-7. **Keyboard shortcuts** — `N` for new task, `Esc` to close modal, arrow keys to move between columns.
+| Layer | Choice |
+|---|---|
+| Frontend | React 18 + TypeScript + Vite |
+| Styling | Tailwind CSS with custom design tokens |
+| Database | Supabase (Postgres + Auth + RLS) |
+| Drag and drop | @dnd-kit/core + @dnd-kit/sortable |
+| Date handling | date-fns |
+| Icons | lucide-react |
+| Hosting | Vercel |
 
 ---
 
@@ -280,15 +41,145 @@ The design uses a deep dark palette (pitch-950 → pitch-700) with an electric l
 
 ```
 src/
-├── components/
-│   ├── board/          # Board, Column, TaskCard, DragOverlay
-│   ├── layout/         # AppLayout, Sidebar, TopBar
-│   └── ui/             # Shared UI: Modal, Button, LoadingScreen, ErrorScreen
-├── hooks/              # useTasks, useSprint, useCreateTask, useUpdateTask
-├── lib/
-│   ├── supabase.ts     # Supabase client + getOrCreateGuestSession()
-│   ├── database.types.ts  # Generated DB type definitions
-│   └── utils.ts        # cn(), date helpers, filter logic, stats computation
-└── types/
-    └── index.ts        # All TypeScript interfaces and types
+  App.tsx                        # Auth initialization, root render
+  components/
+    board/
+      Board.tsx                  # DndContext, drag handlers, modal orchestration
+      BoardColumn.tsx            # Single column with header, task list, empty state
+      BoardSkeleton.tsx          # Shimmer loading placeholder
+      TaskCard.tsx               # Individual task card with priority, labels, due date
+      CreateTaskModal.tsx        # New task form
+      TaskDetailModal.tsx        # View/edit/delete task modal
+      SprintModal.tsx            # Create/edit/end sprint modal
+    layout/
+      AppLayout.tsx              # Data owner: useTasks, useSprint, toast wiring
+      TopBar.tsx                 # Sprint banner, stats strip, search, filters
+      Sidebar.tsx                # Logo, nav, session indicator
+    ui/
+      Modal.tsx                  # Accessible dialog base component
+      Toast.tsx                  # useToast hook, ToastContainer, ToastChip
+      ErrorScreen.tsx            # Full-screen error fallback
+      LoadingScreen.tsx          # Full-screen loading state
+  hooks/
+    useTasks.ts                  # All task CRUD + optimistic moveTask
+    useSprint.ts                 # Sprint fetch + create/update/end
+    useBoardState.ts             # Groups and filters tasks into BoardState
+  lib/
+    supabase.ts                  # Supabase client + guest session helper
+    utils.ts                     # cn, date helpers, computeBoardStats, applyFilters
+  types/
+    index.ts                     # Task, Sprint, FilterState, BoardState types
 ```
+
+---
+
+## Supabase Schema
+
+### tasks table
+
+```sql
+CREATE TABLE tasks (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title       TEXT NOT NULL,
+  description TEXT,
+  status      TEXT NOT NULL CHECK (status IN ('todo','in_progress','in_review','done')),
+  priority    TEXT NOT NULL CHECK (priority IN ('high','normal','low')),
+  due_date    DATE,
+  labels      TEXT[] NOT NULL DEFAULT '{}',
+  user_id     UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can read own tasks"   ON tasks FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own tasks" ON tasks FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own tasks" ON tasks FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own tasks" ON tasks FOR DELETE USING (auth.uid() = user_id);
+```
+
+### sprints table
+
+```sql
+CREATE TABLE sprints (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name        TEXT NOT NULL,
+  start_date  DATE NOT NULL,
+  end_date    DATE NOT NULL,
+  is_active   BOOLEAN NOT NULL DEFAULT true,
+  user_id     UUID NOT NULL REFERENCES auth.users(id) DEFAULT auth.uid(),
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE sprints ENABLE ROW LEVEL SECURITY;
+
+CREATE UNIQUE INDEX sprints_one_active_per_user
+  ON sprints (user_id)
+  WHERE is_active = true;
+
+CREATE POLICY "Users can read own sprints"   ON sprints FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert own sprints" ON sprints FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update own sprints" ON sprints FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "Users can delete own sprints" ON sprints FOR DELETE USING (auth.uid() = user_id);
+```
+
+---
+
+## Environment Variables
+
+Create `.env.local` in the project root:
+
+```
+VITE_SUPABASE_URL=your_supabase_project_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+Both values are in your Supabase dashboard under Project Settings then API.
+
+---
+
+## Local Development
+
+```bash
+npm install
+npm run dev
+```
+
+Open http://localhost:5173
+
+---
+
+## Design System
+
+| Token | Value | Usage |
+|---|---|---|
+| pitch-950 | #0a0c0f | App background |
+| pitch-900 | #0f1318 | Sidebar, header |
+| pitch-800 | #161b23 | Column backgrounds |
+| pitch-700 | #1e2530 | Card backgrounds |
+| volt-500 | #c8ff00 | Primary accent -- buttons, highlights, progress |
+| Font: body | DM Sans | All UI text |
+| Font: mono | DM Mono | Labels, metadata, stats |
+| Font: display | Space Grotesk | Numbers, sprint name |
+
+---
+
+## Architecture Tradeoffs
+
+**Anonymous auth instead of email/password**
+Reduces friction to zero -- users land on a working board immediately. The tradeoff is that clearing browser storage loses the session. Acceptable for a demo/portfolio context; a production app would add email sign-in.
+
+**Hooks hoisted to AppLayout instead of React Context**
+useTasks and useSprint live in AppLayout and pass data down as props. This avoids a second Supabase fetch (TopBar and Board share the same tasks array) and keeps the data flow explicit and traceable. A Context would make sense if the component tree grew deeper or if more than two consumers needed the data.
+
+**Optimistic updates on drag-and-drop only**
+moveTask updates local state immediately and syncs to Supabase in the background, rolling back on failure. Create, update, and delete wait for Supabase confirmation before updating state -- this prevents stale UUIDs and keeps modals showing accurate data on failure.
+
+**Client-side filtering**
+applyFilters runs in memory on the already-fetched tasks array. This is fast and free at under 500 tasks per user. At scale you would push filtering into the Supabase query with .ilike() and .eq() to reduce payload size.
+
+**No position column for card ordering**
+Tasks are sorted by created_at ASC. Drag-and-drop moves cards between columns but not within a column. Adding within-column ordering would require a position integer column and a reordering algorithm on every drop -- a meaningful increase in complexity for limited UX gain at this scale.
+
+**Single active sprint enforced at DB level**
+A partial unique index on (user_id) WHERE is_active = true means only one active sprint can exist per user regardless of what the UI does. The UI also enforces this by hiding the create form when a sprint is active, but the DB constraint is the real safety net.
