@@ -314,18 +314,26 @@ function StatsStrip({ stats }: StatsStripProps) {
 
       <span className="text-pitch-600">·</span>
 
-      {/* Done count */}
+      {/* To do count */}
       <span className="text-pitch-300">
-        <span className="text-volt-500 font-600">{stats.done}</span>
-        {' '}done
+        <span className="text-pitch-100 font-600">{stats.todo}</span>
+        {' '}to do
       </span>
 
       <span className="text-pitch-600">·</span>
 
-      {/* In-flight (in_progress + in_review) */}
+      {/* In progress + in review */}
       <span className="text-pitch-300">
         <span className="text-amber-400 font-600">{stats.inFlight}</span>
-        {' '}in play
+        {' '}in progress
+      </span>
+
+      <span className="text-pitch-600">·</span>
+
+      {/* Done count */}
+      <span className="text-pitch-300">
+        <span className="text-volt-500 font-600">{stats.done}</span>
+        {' '}done
       </span>
 
       <span className="text-pitch-600">·</span>

@@ -108,6 +108,7 @@ export function formatDueDate(due_date: string | null): string | null {
  */
 export interface BoardStats {
   total:    number   // All tasks
+  todo:     number   // Tasks with status === 'todo'
   done:     number   // Tasks with status === 'done'
   overdue:  number   // Tasks with a past due_date (excluding done tasks)
   inFlight: number   // Tasks that are in_progress or in_review
@@ -126,6 +127,7 @@ export interface BoardStats {
  */
 export function computeBoardStats(tasks: Task[]): BoardStats {
   const total = tasks.length
+  const todo = tasks.filter(t => t.status === 'todo').length
   const done = tasks.filter(t => t.status === 'done').length
   const inFlight = tasks.filter(t => t.status === 'in_progress' || t.status === 'in_review').length
 
@@ -134,7 +136,7 @@ export function computeBoardStats(tasks: Task[]): BoardStats {
     t.status !== 'done' && getDueDateStatus(t.due_date) === 'overdue'
   ).length
 
-  return { total, done, overdue, inFlight }
+  return { total, todo, done, overdue, inFlight }
 }
 
 
