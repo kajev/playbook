@@ -117,7 +117,6 @@ export function useTasks(): UseTasksReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load tasks'
       setError(message)
-      console.error('[useTasks] fetchTasks failed:', err)
     }
   }, []) // Empty deps — this function never needs to change
 
@@ -289,7 +288,6 @@ export function useTasks(): UseTasksReturn {
       // Step 4b: Rollback to pre-drag state
       setTasks(previousTasks)
       setError(`Failed to move task: ${updateError.message}`)
-      console.error('[useTasks] moveTask rollback triggered:', updateError)
     }
     // Step 4a: Success path — nothing to do, state is correct
   }, []) // Empty deps — reads tasksRef.current at call time, not closure time

@@ -7,9 +7,33 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!--
+      viewport-fit=cover lets the app extend behind iPhone notches/home-indicators
+      when installed as a PWA. Combined with safe-area-inset CSS this gives a
+      proper edge-to-edge feel on iOS.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
     <title>Playbook — Team Task Board</title>
     <meta name="description" content="A fast, focused Kanban board for sports teams and game studios." />
+
+    <!--
+      PWA support (Push 0).
+      - manifest.webmanifest tells the browser this site is installable.
+      - theme-color tints the address bar and the PWA splash screen background.
+        Matches our dark app background so there's no flash on launch.
+      - apple-mobile-web-app-* meta tags are iOS-specific. iOS Safari ignores
+        the manifest's display/theme fields and reads these instead.
+      - apple-touch-icon is what iOS uses for the home-screen icon when a user
+        does Share → Add to Home Screen. It must be a real PNG (not an SVG).
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="apple-mobile-web-app-title" content="Playbook" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
 
     <!--
       Google Fonts:

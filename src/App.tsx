@@ -67,7 +67,6 @@ export default function App() {
         setAuthError(message)
         setAuthState('error')
         // Log for debugging — remove in production or use a proper logger
-        console.error('[Auth] Failed to initialize guest session:', err)
       }
     }
 

@@ -195,7 +195,6 @@ export function TaskDetailModal({
       await deleteTask(task.id)
       onClose() // Modal closes when task is deleted
     } catch (err) {
-      console.error('[TaskDetailModal] Delete failed:', err)
       setDeleting(false)
       setDeleteConfirm(false)
     }
