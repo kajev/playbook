@@ -1,6 +1,6 @@
 # Playbook
 
-A Kanban task board built for **Next Play Games**. Dark mode, energetic volt accent, drag-and-drop columns, sprint management, and real-time Supabase persistence.
+A Kanban task board for personal use. Dark mode, energetic volt accent, drag-and-drop columns, sprint management, and real-time Supabase persistence.
 
 **Live:** https://playbook-psi-nine.vercel.app
 **Repo:** https://github.com/kajev/playbook
