@@ -57,3 +57,7 @@ coverage/
 !.env.local.example    # Keep the example file — it shows devs what vars to set
 .DS_Store
 **/.DS_Store
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
