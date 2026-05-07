@@ -61,3 +61,5 @@ coverage/
 # Tauri
 src-tauri/target/
 src-tauri/gen/
+
+supabase/.temp/
