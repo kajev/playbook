@@ -1,6 +1,7 @@
 -- Push 4: RPCs that lock completion/skip dates to user_today(auth.uid())
--- Uses the real schema columns: completed_by, completed_for_date,
--- skipped_by, skipped_for_date.
+-- Matches the existing 2-column unique constraints on
+-- reminder_completions(reminder_id, completed_for_date) and
+-- reminder_skips(reminder_id, skipped_for_date).
 
 grant execute on function public.user_today(uuid) to authenticated;
 
@@ -12,7 +13,7 @@ declare v_row reminder_completions;
 begin
   insert into reminder_completions (reminder_id, completed_by, completed_for_date)
   values (p_reminder_id, auth.uid(), user_today(auth.uid()))
-  on conflict (reminder_id, completed_by, completed_for_date)
+  on conflict (reminder_id, completed_for_date)
     do update set completed_at = now()
   returning * into v_row;
   return v_row;
@@ -41,7 +42,7 @@ declare v_row reminder_skips;
 begin
   insert into reminder_skips (reminder_id, skipped_by, skipped_for_date)
   values (p_reminder_id, auth.uid(), user_today(auth.uid()))
-  on conflict (reminder_id, skipped_by, skipped_for_date) do nothing
+  on conflict (reminder_id, skipped_for_date) do nothing
   returning * into v_row;
 
   if v_row.id is null then
