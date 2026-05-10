@@ -1,8 +1,6 @@
 /**
  * components/layout/AppLayout.tsx — Main shell.
- *
- * Push 5: adds page state ('board' | 'routine'). Sidebar toggles between them.
- * Routine page has its own composition (RoutinePage); does not share TopBar.
+ * Push 6: page state expanded to include 'companions'.
  */
 
 import { useState, useCallback, useRef } from 'react'
@@ -10,6 +8,7 @@ import { Sidebar }  from './Sidebar'
 import { TopBar }   from './TopBar'
 import { Board }    from '@/components/board/Board'
 import { RoutinePage } from '@/components/routine/RoutinePage'
+import { CompanionsPage } from '@/components/companions/CompanionsPage'
 import { Modal }    from '@/components/ui/Modal'
 import { SprintModal } from '@/components/board/SprintModal'
 import { useSprint } from '@/hooks/useSprint'
@@ -22,7 +21,7 @@ interface AppLayoutProps {
   userId: string
 }
 
-export type AppPage = 'board' | 'routine'
+export type AppPage = 'board' | 'routine' | 'companions'
 
 export function AppLayout({ userId }: AppLayoutProps) {
   const [page, setPage] = useState<AppPage>('board')
@@ -94,6 +93,10 @@ export function AppLayout({ userId }: AppLayoutProps) {
 
           {page === 'routine' && (
             <RoutinePage userId={userId} addToast={addToast} />
+          )}
+
+          {page === 'companions' && (
+            <CompanionsPage userId={userId} addToast={addToast} />
           )}
         </div>
       </div>

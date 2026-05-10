@@ -1,9 +1,9 @@
 /**
  * components/layout/Sidebar.tsx — Left nav.
- * Push 5: now navigates between Board and Daily Routine.
+ * Push 6: adds Companions entry.
  */
 
-import { LayoutGrid, Zap, CalendarCheck } from 'lucide-react'
+import { LayoutGrid, Zap, CalendarCheck, Users } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { AppPage } from './AppLayout'
 
@@ -26,18 +26,9 @@ export function Sidebar({ userId, page, onNavigate }: SidebarProps) {
       </div>
 
       <nav className="flex-1 px-3 py-4 flex flex-col gap-1">
-        <NavItem
-          icon={<LayoutGrid size={15} />}
-          label="Board"
-          active={page === 'board'}
-          onClick={() => onNavigate('board')}
-        />
-        <NavItem
-          icon={<CalendarCheck size={15} />}
-          label="Daily Routine"
-          active={page === 'routine'}
-          onClick={() => onNavigate('routine')}
-        />
+        <NavItem icon={<LayoutGrid size={15} />} label="Board" active={page === 'board'} onClick={() => onNavigate('board')} />
+        <NavItem icon={<CalendarCheck size={15} />} label="Daily Routine" active={page === 'routine'} onClick={() => onNavigate('routine')} />
+        <NavItem icon={<Users size={15} />} label="Companions" active={page === 'companions'} onClick={() => onNavigate('companions')} />
       </nav>
 
       <div className="px-4 py-4 border-t border-pitch-500/30">
@@ -55,13 +46,7 @@ export function Sidebar({ userId, page, onNavigate }: SidebarProps) {
   )
 }
 
-interface NavItemProps {
-  icon: React.ReactNode
-  label: string
-  active: boolean
-  onClick: () => void
-}
-function NavItem({ icon, label, active, onClick }: NavItemProps) {
+function NavItem({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
