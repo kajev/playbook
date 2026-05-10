@@ -1,20 +1,16 @@
-// Playbook service worker — Push 0 (minimal).
+// Playbook service worker.
 //
-// At this stage the service worker only exists so the browser treats
-// Playbook as a "real" PWA (required for iOS "Add to Home Screen" to
-// behave correctly and for Web Push API access in Push 10).
+// v0.2.0 (Push 7.5):
+//   - Bumped version forces the browser to treat this as a NEW SW after deploy.
+//   - 'message' handler so the page can tell waiting SW to skipWaiting.
 //
-// Push 10 will expand this file with:
-//   - 'push' event handler for Web Push notifications
-//   - 'notificationclick' to open the app to the relevant ping
-//   - cache strategies for offline asset access
-//
-// For now: install + activate lifecycle only. No caching, no fetch handler.
+// Push 10 will add: 'push', 'notificationclick', cache strategies.
 
-const SW_VERSION = 'playbook-sw-v0.1.0';
+const SW_VERSION = 'playbook-sw-v0.2.0';
 
 self.addEventListener('install', (event) => {
-  // Activate this SW immediately, replacing any older one.
+  // Activate immediately so a new deploy can take over without users
+  // having to close all tabs first.
   self.skipWaiting();
 });
 
@@ -23,6 +19,13 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(self.clients.claim());
 });
 
-// Intentionally no 'fetch' handler in Push 0.
-// Adding an empty one would still proxy every request through the SW
-// for no benefit. We skip it entirely until Push 10.
+self.addEventListener('message', (event) => {
+  // Page can post { type: 'SKIP_WAITING' } to force the new SW to activate
+  // when the user clicks "Update available" in the topbar.
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+// Intentionally no 'fetch' handler yet. Adding an empty one proxies every
+// request through the SW for no benefit. Real caching arrives with Push 10.

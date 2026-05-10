@@ -1,10 +1,13 @@
 /**
  * components/layout/Sidebar.tsx — Left nav.
- * Push 6: adds Companions entry.
+ * Push 7.5: adds Sign out button at the bottom (under user indicator)
+ * and an "Update available" pill that appears when the SW reports one.
  */
 
-import { LayoutGrid, Zap, CalendarCheck, Users } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { LayoutGrid, Zap, CalendarCheck, Users, LogOut, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { signOutCompletely } from '@/lib/supabase/auth'
 import type { AppPage } from './AppLayout'
 
 interface SidebarProps {
@@ -14,6 +17,37 @@ interface SidebarProps {
 }
 
 export function Sidebar({ userId, page, onNavigate }: SidebarProps) {
+  const [updateAvailable, setUpdateAvailable] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+
+  useEffect(() => {
+    const handler = () => setUpdateAvailable(true)
+    window.addEventListener('playbook:update-available', handler)
+    return () => window.removeEventListener('playbook:update-available', handler)
+  }, [])
+
+  const handleApplyUpdate = async () => {
+    if (!('serviceWorker' in navigator)) { window.location.reload(); return }
+    const reg = await navigator.serviceWorker.getRegistration()
+    if (reg?.waiting) {
+      reg.waiting.postMessage({ type: 'SKIP_WAITING' })
+      // controllerchange listener in main.tsx will reload the page.
+    } else {
+      window.location.reload()
+    }
+  }
+
+  const handleSignOut = async () => {
+    if (signingOut) return
+    if (!confirm('Sign out? Your local data will be cleared and a new guest session will start.')) return
+    setSigningOut(true)
+    try {
+      await signOutCompletely()
+    } catch {
+      setSigningOut(false)
+    }
+  }
+
   return (
     <aside className="w-[200px] shrink-0 flex flex-col bg-pitch-900 border-r border-pitch-500/30">
       <div className="h-[60px] flex items-center gap-2.5 px-5 border-b border-pitch-500/30">
@@ -31,7 +65,18 @@ export function Sidebar({ userId, page, onNavigate }: SidebarProps) {
         <NavItem icon={<Users size={15} />} label="Companions" active={page === 'companions'} onClick={() => onNavigate('companions')} />
       </nav>
 
-      <div className="px-4 py-4 border-t border-pitch-500/30">
+      {updateAvailable && (
+        <button
+          onClick={handleApplyUpdate}
+          className="mx-3 mb-2 flex items-center gap-2 px-3 py-2 rounded-lg bg-volt-500/15 border border-volt-500/40 text-volt-300 hover:bg-volt-500/25 transition-colors duration-150"
+          title="A new version is available. Click to update."
+        >
+          <Download size={14} />
+          <span className="font-sans font-500 text-[12px]">Update available</span>
+        </button>
+      )}
+
+      <div className="px-4 py-4 border-t border-pitch-500/30 flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-full bg-pitch-600 flex items-center justify-center flex-shrink-0">
             <span className="font-mono text-[10px] text-pitch-200">G</span>
@@ -41,6 +86,18 @@ export function Sidebar({ userId, page, onNavigate }: SidebarProps) {
             <div className="font-mono text-[10px] text-pitch-400 truncate">#{userId.slice(0, 6)}</div>
           </div>
         </div>
+        <button
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className={cn(
+            'flex items-center gap-2 px-2 py-1.5 rounded-md transition-colors duration-150',
+            'text-pitch-400 hover:text-red-400 hover:bg-pitch-800',
+          )}
+          title="Sign out and clear local data"
+        >
+          <LogOut size={13} />
+          <span className="font-sans text-[12px]">{signingOut ? 'Signing out…' : 'Sign out'}</span>
+        </button>
       </div>
     </aside>
   )
