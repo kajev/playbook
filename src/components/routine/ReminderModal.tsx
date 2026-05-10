@@ -1,10 +1,14 @@
 /**
  * ReminderModal — create / edit reminder.
+ * Push 6.x: target picker uses display names from profiles.
  */
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { cn } from '@/lib/utils'
 import { createReminder, updateReminder } from '@/lib/supabase/reminders'
+import { useConnections } from '@/lib/hooks/useConnections'
+import { useProfiles } from '@/lib/hooks/useProfiles'
+import { supabase } from '@/lib/supabase'
 import type { Reminder, ReminderInsert, ReminderUpdate, Recurrence, Visibility } from '@/lib/types/database'
 
 interface ReminderModalProps {
@@ -16,13 +20,21 @@ interface ReminderModalProps {
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 export function ReminderModal({ editing, onClose, onError }: ReminderModalProps) {
+  const [selfId, setSelfId] = useState<string | null>(null)
   const [title, setTitle] = useState('')
   const [notes, setNotes] = useState('')
   const [visibility, setVisibility] = useState<Visibility>('private')
   const [recurrence, setRecurrence] = useState<Recurrence>('daily')
   const [customDays, setCustomDays] = useState<number[]>([1, 2, 3, 4, 5])
   const [dueTime, setDueTime] = useState('')
+  const [targetId, setTargetId] = useState<string>('')
   const [saving, setSaving] = useState(false)
+
+  const { connections } = useConnections()
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setSelfId(data.user?.id ?? null))
+  }, [])
 
   useEffect(() => {
     if (editing) {
@@ -32,6 +44,7 @@ export function ReminderModal({ editing, onClose, onError }: ReminderModalProps)
       setRecurrence((editing.recurrence as Recurrence) ?? 'daily')
       setCustomDays(editing.custom_days ?? [1, 2, 3, 4, 5])
       setDueTime(editing.due_time?.slice(0, 5) ?? '')
+      setTargetId(editing.target_user_id ?? '')
     } else {
       setTitle('')
       setNotes('')
@@ -39,8 +52,15 @@ export function ReminderModal({ editing, onClose, onError }: ReminderModalProps)
       setRecurrence('daily')
       setCustomDays([1, 2, 3, 4, 5])
       setDueTime('')
+      setTargetId('')
     }
   }, [editing])
+
+  const partners = useMemo(
+    () => connections.map(c => (c.user_a === selfId ? c.user_b : c.user_a)),
+    [connections, selfId],
+  )
+  const { displayName } = useProfiles(partners)
 
   const handleSubmit = async () => {
     if (saving) return
@@ -54,6 +74,7 @@ export function ReminderModal({ editing, onClose, onError }: ReminderModalProps)
         recurrence,
         custom_days: recurrence === 'weekly' ? customDays : null,
         due_time: dueTime ? `${dueTime}:00` : null,
+        target_user_id: visibility === 'shared' && targetId ? targetId : null,
       }
       if (editing) {
         await updateReminder(editing.id, payload as ReminderUpdate)
@@ -120,6 +141,28 @@ export function ReminderModal({ editing, onClose, onError }: ReminderModalProps)
         </div>
       </div>
 
+      {visibility === 'shared' && (
+        <div>
+          <label className="block font-sans text-[12px] text-pitch-300 mb-1">For</label>
+          {partners.length === 0 ? (
+            <div className="text-pitch-400 text-[12px] font-sans p-3 rounded-lg bg-pitch-800/60 border border-pitch-500/20">
+              No companions yet. Add one from the Companions page first.
+            </div>
+          ) : (
+            <select
+              value={targetId}
+              onChange={e => setTargetId(e.target.value)}
+              className="w-full h-9 px-2 bg-pitch-800 border border-pitch-500/40 rounded-lg font-sans text-[13px] text-pitch-100 focus:outline-none focus:border-volt-500/60"
+            >
+              <option value="">Yourself (visible to companions)</option>
+              {partners.map(pid => (
+                <option key={pid} value={pid}>{displayName(pid)}</option>
+              ))}
+            </select>
+          )}
+        </div>
+      )}
+
       {recurrence === 'weekly' && (
         <div>
           <label className="block font-sans text-[12px] text-pitch-300 mb-1">Days</label>
@@ -151,12 +194,6 @@ export function ReminderModal({ editing, onClose, onError }: ReminderModalProps)
           className="h-9 px-3 bg-pitch-800 border border-pitch-500/40 rounded-lg font-sans text-[13px] text-pitch-100 focus:outline-none focus:border-volt-500/60"
         />
       </div>
-
-      {visibility === 'shared' && (
-        <div className="text-pitch-400 text-[11px] font-sans">
-          Note: Companion picker arrives in Push 6. For now, shared reminders show only on your view.
-        </div>
-      )}
 
       <div className="flex justify-end gap-2 pt-2">
         <button

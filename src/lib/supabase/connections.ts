@@ -1,8 +1,6 @@
 import { supabase } from '../supabase'
 import type { Connection, ConnectionInvite } from '../types/database'
 
-// connection_invites Insert columns are tightly typed (likely RLS auto-fills
-// inviter_id via a default). Cast around the typed insert.
 type InviteInsertLoose = Record<string, unknown>
 
 export async function listConnections(): Promise<Connection[]> {
@@ -32,8 +30,8 @@ export async function sendInvite(opts: { email?: string; ttlHours?: number } = {
     const code = generateCode()
     const row: InviteInsertLoose = {
       inviter_id: u.user.id,
-      code,
-      email: opts.email ?? null,
+      invite_code: code,
+      invitee_email: opts.email ?? null,
       expires_at,
     }
     const { data, error } = await supabase
