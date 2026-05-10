@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { getProfilesByIds, getMyProfile } from '../supabase/profiles'
+import { supabase } from '../supabase'
 import { db } from '../db/dexie'
 import type { Profile } from '../types/database'
 
@@ -10,13 +11,11 @@ import type { Profile } from '../types/database'
 export function useProfiles(ids: string[]) {
   const key = ids.slice().sort().join(',')
 
-  // Read from Dexie immediately.
-  const cached = useLiveQuery(async () => {
-    if (ids.length === 0) return [] as Profile[]
+  const cached = useLiveQuery(async (): Promise<Profile[]> => {
+    if (ids.length === 0) return []
     return db.profiles.where('id').anyOf(ids).toArray()
-  }, [key], [] as Profile[])
+  }, [key])
 
-  // Background refresh from Supabase.
   useEffect(() => {
     if (ids.length === 0) return
     let cancelled = false
@@ -40,15 +39,24 @@ export function useProfiles(ids: string[]) {
   return { byId, displayName, loading: false }
 }
 
+/**
+ * useMyProfile — strictly read MY OWN profile row from the cache (filtered
+ * by auth.uid). Push 7.5 fix: previously read toArray()[0] which could
+ * return a companion's profile if theirs was cached first.
+ */
 export function useMyProfile() {
   const [refreshing, setRefreshing] = useState(true)
+  const [myId, setMyId] = useState<string | null>(null)
 
-  // Cache-first: read whichever row in profiles matches my ID once we know it.
-  const profile = useLiveQuery(async () => {
-    const list = await db.profiles.toArray()
-    if (list.length === 0) return null
-    return list[0] ?? null
-  }, [], null)
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setMyId(data.user?.id ?? null))
+  }, [])
+
+  const profile = useLiveQuery(async (): Promise<Profile | null> => {
+    if (!myId) return null
+    const row = await db.profiles.where('id').equals(myId).first()
+    return row ?? null
+  }, [myId])
 
   const refetch = async () => {
     setRefreshing(true)
