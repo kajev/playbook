@@ -1,34 +1,35 @@
 import { useEffect, useState } from 'react'
-import { getProfilesByIds } from '../supabase/profiles'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { getProfilesByIds, getMyProfile } from '../supabase/profiles'
+import { db } from '../db/dexie'
 import type { Profile } from '../types/database'
 
 /**
- * useProfiles — fetches profiles for a set of user IDs and exposes a lookup helper.
- * displayName(id) returns the profile.display_name or a fallback truncated id.
+ * useProfiles — cache-first profile lookup for a set of user IDs.
  */
 export function useProfiles(ids: string[]) {
-  const [byId, setById] = useState<Record<string, Profile>>({})
-  const [loading, setLoading] = useState(false)
-
-  // stable key to avoid reloading on every render
   const key = ids.slice().sort().join(',')
 
+  // Read from Dexie immediately.
+  const cached = useLiveQuery(async () => {
+    if (ids.length === 0) return [] as Profile[]
+    return db.profiles.where('id').anyOf(ids).toArray()
+  }, [key], [] as Profile[])
+
+  // Background refresh from Supabase.
   useEffect(() => {
+    if (ids.length === 0) return
     let cancelled = false
-    if (ids.length === 0) { setById({}); return }
-    setLoading(true)
-    getProfilesByIds(ids)
-      .then(profiles => {
-        if (cancelled) return
-        const map: Record<string, Profile> = {}
-        for (const p of profiles) map[p.id] = p
-        setById(map)
-      })
-      .catch(() => { /* silent — UI falls back to truncated id */ })
-      .finally(() => { if (!cancelled) setLoading(false) })
+    getProfilesByIds(ids).then(profiles => {
+      if (cancelled) return
+      if (profiles.length > 0) db.profiles.bulkPut(profiles).catch(() => {})
+    }).catch(() => {})
     return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key])
+
+  const byId: Record<string, Profile> = {}
+  for (const p of cached ?? []) byId[p.id] = p
 
   const displayName = (id: string): string => {
     const p = byId[id]
@@ -36,25 +37,30 @@ export function useProfiles(ids: string[]) {
     return `Companion #${id.slice(0, 6)}`
   }
 
-  return { byId, displayName, loading }
+  return { byId, displayName, loading: false }
 }
 
 export function useMyProfile() {
-  const [profile, setProfile] = useState<Profile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(true)
+
+  // Cache-first: read whichever row in profiles matches my ID once we know it.
+  const profile = useLiveQuery(async () => {
+    const list = await db.profiles.toArray()
+    if (list.length === 0) return null
+    return list[0] ?? null
+  }, [], null)
 
   const refetch = async () => {
-    setLoading(true)
+    setRefreshing(true)
     try {
-      const { getMyProfile } = await import('../supabase/profiles')
       const p = await getMyProfile()
-      setProfile(p)
+      if (p) await db.profiles.put(p)
     } finally {
-      setLoading(false)
+      setRefreshing(false)
     }
   }
 
   useEffect(() => { refetch() }, [])
 
-  return { profile, loading, refetch }
+  return { profile: profile ?? null, loading: refreshing && !profile, refetch }
 }
