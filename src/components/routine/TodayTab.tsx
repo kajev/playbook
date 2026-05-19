@@ -1,5 +1,6 @@
 /**
- * TodayTab — reminders due today, grouped by visibility.
+ * TodayTab - reminders due today AND assigned to me, grouped by visibility.
+ * Push 7.6: filter by doer. Shared reminders targeted at someone else hide from my Today.
  */
 
 import { useMemo } from 'react'
@@ -18,16 +19,27 @@ interface TodayTabProps {
   onCreateFirst: () => void
 }
 
-export function TodayTab({ reminders, today, onEdit, onError, onCreateFirst }: TodayTabProps) {
+function isMyReminder(r: Reminder, userId: string): boolean {
+  if (r.visibility !== 'shared') return true
+  if (r.target_user_id) return r.target_user_id === userId
+  return r.owner_id === userId
+}
+
+export function TodayTab({ reminders, today, userId, onEdit, onError, onCreateFirst }: TodayTabProps) {
+  const mine = useMemo(
+    () => reminders.filter(r => isMyReminder(r, userId)),
+    [reminders, userId],
+  )
+
   const dueToday = useMemo(() => {
     const now = new Date()
-    return reminders.filter(r => isDueOn(r, now))
-  }, [reminders])
+    return mine.filter(r => isDueOn(r, now))
+  }, [mine])
 
   const shared = dueToday.filter(r => r.visibility === 'shared')
   const privateOnes = dueToday.filter(r => r.visibility !== 'shared')
 
-  if (!reminders.length) {
+  if (!mine.length) {
     return (
       <EmptyState
         title="No reminders yet"

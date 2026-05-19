@@ -1,6 +1,6 @@
 /**
- * CompanionsPage — manage Companions (1:1 connections).
- * Push 6.x: profile-editing card at the top so display names appear in lists.
+ * CompanionsPage - manage Companions (1:1 connections).
+ * Push 7.6: clicking a companion opens their read-only routine view.
  */
 
 import { useState } from 'react'
@@ -12,6 +12,7 @@ import { CompanionList } from './CompanionList'
 import { PendingInvitesList } from './PendingInvitesList'
 import { CompanionAddModal } from './CompanionAddModal'
 import { ProfileCard } from './ProfileCard'
+import { CompanionRoutinePage } from './CompanionRoutinePage'
 import type { useToast } from '@/components/ui/Toast'
 
 interface CompanionsPageProps {
@@ -21,11 +22,21 @@ interface CompanionsPageProps {
 
 export function CompanionsPage({ userId, addToast }: CompanionsPageProps) {
   const [modalOpen, setModalOpen] = useState(false)
+  const [selectedCompanion, setSelectedCompanion] = useState<string | null>(null)
   const { connections, pendingInvites, loading, error } = useConnections()
   const { profile, refetch: refetchProfile } = useMyProfile()
 
   const onError = (msg: string) => addToast({ type: 'error', message: msg })
   const onSuccess = (msg: string) => addToast({ type: 'success', message: msg })
+
+  if (selectedCompanion) {
+    return (
+      <CompanionRoutinePage
+        companionId={selectedCompanion}
+        onBack={() => setSelectedCompanion(null)}
+      />
+    )
+  }
 
   return (
     <>
@@ -51,7 +62,7 @@ export function CompanionsPage({ userId, addToast }: CompanionsPageProps) {
         )}
 
         {loading && (
-          <div className="text-pitch-400 text-sm text-center py-12">Loading…</div>
+          <div className="text-pitch-400 text-sm text-center py-12">Loading...</div>
         )}
 
         {!loading && !error && (
@@ -90,6 +101,7 @@ export function CompanionsPage({ userId, addToast }: CompanionsPageProps) {
                 <CompanionList
                   connections={connections}
                   selfId={userId}
+                  onSelect={setSelectedCompanion}
                   onError={onError}
                   onSuccess={onSuccess}
                 />
